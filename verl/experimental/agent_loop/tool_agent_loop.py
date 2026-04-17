@@ -261,8 +261,16 @@ class ToolAgentLoop(AgentLoopBase):
         if output.log_probs:
             agent_data.response_logprobs += output.log_probs
 
-        if output.routed_experts is not None:
-            agent_data.routed_experts = output.routed_experts
+        # On multi-turn rollout the model version may differ between turns, so keep
+        # existing routing and only append routing for newly generated tokens.
+        if output.routed_experts is not None and len(output.token_ids) > 0:
+            if agent_data.routed_experts is None:
+                agent_data.routed_experts = output.routed_experts
+            else:
+                agent_data.routed_experts = torch.cat(
+                    [agent_data.routed_experts, output.routed_experts[-len(output.token_ids) :]],
+                    dim=0,
+                )
 
         # Check termination conditions
         if not ignore_termination and len(agent_data.response_mask) >= self.response_length:
